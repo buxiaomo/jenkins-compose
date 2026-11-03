@@ -1,0 +1,7 @@
+com.cloudbees.plugins.credentials.SystemCredentialsProvider.getInstance().getCredentials().forEach{
+  println("-----------------------")
+  it.properties.each { prop, val ->
+	  println(prop + ' = "' + val + '"')  
+  }
+  println("")
+}
