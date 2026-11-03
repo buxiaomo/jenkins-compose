@@ -1,0 +1,73 @@
+version: "3.8"
+services:
+  master:
+    image: docker.io/buxiaomo/jenkins:2.580.1-alpine-jdk25
+    hostname: master
+    networks:
+      jenkins:
+    ports:
+      - 8080:8080/tcp
+      - 50000:50000/tcp
+    volumes:
+      - /home/actions-runner/runner/jenkins:/var/jenkins_home
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        order: stop-first
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints:
+          - node.labels.jenkins.master == true
+    environment:
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+      - JAVA_OPTS=-Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=true -Djenkins.install.runSetupWizard=false -Djenkins.security.ApiTokenProperty.showTokenToAdmins=true -Dhudson.slaves.ChannelPinger.pingIntervalSeconds=600 -Dhudson.slaves.ChannelPinger.pingTimeoutSeconds=600 -Djdk.tls.ephemeralDHKeySize=2048 -Dhttps.protocols=TLSv1.2 -Dorg.jenkinsci.plugins.gitclient.GitClient.untrustedSSL=true
+      - JENKINS_OPTS=--prefix=/jenkins --httpPort=8080
+    # healthcheck:
+    #   test: ["CMD-SHELL", "nc -w 1 127.0.0.1 -z 8080 || exit 1"]
+    #   interval: 20s
+    #   timeout: 5s
+    #   retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 100m
+
+  worker:
+    image: docker.io/buxiaomo/jenkins-swarm:1258.vda_14ddda_0613
+    networks:
+      jenkins:
+    configs:
+      - source: timezome
+        target: /etc/localtime
+    env_file:
+      - worker.env
+    volumes:
+      - /home/actions-runner/runner/workspace:/home/jenkins:rw
+      - /data/jenkins-swarm:/data/jenkins-swarm:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+      placement:
+        constraints:
+          - node.labels.jenkins.worker == true
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 100m
+
+configs:
+  timezome:
+    file: /usr/share/zoneinfo/Asia/Shanghai
+
+networks:
+  jenkins:
